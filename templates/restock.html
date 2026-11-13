@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+
+{% block title %}Receive Stock Delivery{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                <div>
+                    <h5 class="fw-bold mb-0 text-slate-800">
+                        <i class="bi bi-box-arrow-in-down-left me-2 text-success"></i> Receive Pharmaceutical Delivery (Stock In)
+                    </h5>
+                    <span class="text-muted small">Intake new shipments and register batch lot numbers</span>
+                </div>
+                <a href="{{ url_for('inventory') }}" class="btn btn-sm btn-outline-secondary">Cancel</a>
+            </div>
+
+            <div class="card-body p-4">
+                <form method="POST" action="{{ url_for('restock') }}">
+                    <!-- Select Medicine -->
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Select Medicine Received <span class="text-danger">*</span></label>
+                        <select name="medicine_id" id="medicineSelect" class="form-select form-select-lg" required>
+                            <option value="">-- Choose Medicine --</option>
+                            {% for med in medicines %}
+                                <option value="{{ med.id }}" data-unit="{{ med.unit }}" {% if preselected_med_id == med.id %}selected{% endif %}>
+                                    {{ med.brand_name }} ({{ med.generic_name }} {{ med.strength }}) — Current: {{ med.total_stock }} {{ med.unit }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Batch Option Switch -->
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold d-block">Intake Mode</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="batch_mode" id="modeNew" value="new" checked autocomplete="off">
+                            <label class="btn btn-outline-primary" for="modeNew">
+                                <i class="bi bi-plus-circle me-1"></i> New Batch Delivery
+                            </label>
+
+                            <input type="radio" class="btn-check" name="batch_mode" id="modeExisting" value="existing" autocomplete="off">
+                            <label class="btn btn-outline-primary" for="modeExisting">
+                                <i class="bi bi-arrow-repeat me-1"></i> Add to Existing Batch
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- New Batch Fields -->
+                    <div id="newBatchFields" class="p-3 bg-light rounded border mb-4">
+                        <h6 class="fw-bold small text-muted text-uppercase mb-3">New Batch Details</h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">Batch / Lot Number <span class="text-danger">*</span></label>
+                                <input type="text" name="batch_number" id="batchNumberInput" class="form-control" placeholder="e.g. BN2024-X91">
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">Expiration Date <span class="text-danger">*</span></label>
+                                <input type="date" name="expiry_date" id="expiryDateInput" class="form-control">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold">Purchase Price ($ / unit)</label>
+                                <input type="number" step="0.01" min="0" name="purchase_price" class="form-control" placeholder="0.25">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold">Selling Price ($ / unit)</label>
+                                <input type="number" step="0.01" min="0" name="selling_price" class="form-control" placeholder="0.65">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold">Supplier / Wholesaler</label>
+                                <input type="text" name="supplier" class="form-control" placeholder="e.g. Zuellig, DKSH">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Existing Batch Dropdown (Hidden by default) -->
+                    <div id="existingBatchFields" class="mb-4" style="display: none;">
+                        <label class="form-label fw-semibold">Select Existing Batch to Replenish <span class="text-danger">*</span></label>
+                        <select name="existing_batch_id" id="existingBatchSelect" class="form-select">
+                            <option value="">-- Choose Existing Batch --</option>
+                        </select>
+                    </div>
+
+                    <!-- Quantity Received -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Received Quantity <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input type="number" min="1" name="quantity" class="form-control" placeholder="e.g. 200" required>
+                                <span class="input-group-text" id="unitLabel">Units</span>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Invoice / Delivery Order #</label>
+                            <input type="text" name="reference_no" class="form-control" placeholder="e.g. INV-90412">
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Receiving Notes / Quality Check</label>
+                            <input type="text" name="notes" class="form-control" placeholder="e.g. Package intact, cold chain verified at 4°C">
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                        <a href="{{ url_for('inventory') }}" class="btn btn-outline-secondary px-4">Cancel</a>
+                        <button type="submit" class="btn btn-success px-4 fw-semibold">
+                            <i class="bi bi-check2-circle me-1"></i> Confirm Stock Intake
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const medSelect = document.getElementById('medicineSelect');
+    const modeNew = document.getElementById('modeNew');
+    const modeExisting = document.getElementById('modeExisting');
+    const newBatchFields = document.getElementById('newBatchFields');
+    const existingBatchFields = document.getElementById('existingBatchFields');
+    const existingBatchSelect = document.getElementById('existingBatchSelect');
+    const unitLabel = document.getElementById('unitLabel');
+    const batchNumberInput = document.getElementById('batchNumberInput');
+    const expiryDateInput = document.getElementById('expiryDateInput');
+
+    function toggleMode() {
+        if (modeExisting.checked) {
+            newBatchFields.style.display = 'none';
+            existingBatchFields.style.display = 'block';
+            batchNumberInput.required = false;
+            expiryDateInput.required = false;
+            existingBatchSelect.required = true;
+        } else {
+            newBatchFields.style.display = 'block';
+            existingBatchFields.style.display = 'none';
+            batchNumberInput.required = true;
+            expiryDateInput.required = true;
+            existingBatchSelect.required = false;
+        }
+    }
+
+    function loadExistingBatches(medId) {
+        if (!medId) return;
+        const selectedOption = medSelect.options[medSelect.selectedIndex];
+        unitLabel.textContent = selectedOption.dataset.unit || 'Units';
+
+        fetch(`/api/medicine/${medId}/batches`)
+            .then(res => res.json())
+            .then(batches => {
+                existingBatchSelect.innerHTML = '<option value="">-- Choose Existing Batch --</option>';
+                batches.forEach(b => {
+                    const opt = document.createElement('option');
+                    opt.value = b.id;
+                    opt.textContent = `${b.batch_number} (Exp: ${b.expiry_date}) — Current Stock: ${b.quantity}`;
+                    existingBatchSelect.appendChild(opt);
+                });
+            });
+    }
+
+    modeNew.addEventListener('change', toggleMode);
+    modeExisting.addEventListener('change', toggleMode);
+    medSelect.addEventListener('change', function() {
+        loadExistingBatches(this.value);
+    });
+
+    if (medSelect.value) {
+        loadExistingBatches(medSelect.value);
+    }
+    toggleMode();
+});
+</script>
+{% endblock %}

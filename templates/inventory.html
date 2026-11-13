@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+
+{% block title %}Inventory{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <div>
+        <h2 class="h3 fw-bold mb-1 text-slate-800">Pharmaceutical Inventory</h2>
+        <p class="text-muted mb-0 small">Manage medicines, calculate safety thresholds, and monitor batch expirations.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('add_medicine') }}" class="btn btn-primary btn-sm px-3 shadow-sm">
+            <i class="bi bi-plus-circle me-1"></i> Add Medicine
+        </a>
+    </div>
+</div>
+
+<!-- Search & Filter Controls -->
+<div class="card mb-4">
+    <div class="card-body p-3">
+        <form method="GET" action="{{ url_for('inventory') }}" class="row g-2 align-items-center">
+            <!-- Search Input -->
+            <div class="col-md-5">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" name="search" class="form-control" placeholder="Search brand name, generic name, or strength..." value="{{ search }}">
+                </div>
+            </div>
+
+            <!-- Category Filter -->
+            <div class="col-md-3">
+                <select name="category" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="">All Categories</option>
+                    {% for cat in categories %}
+                        <option value="{{ cat.id }}" {% if current_category == cat.id %}selected{% endif %}>
+                            {{ cat.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Submit & Reset Buttons -->
+            <div class="col-md-4 d-flex gap-2">
+                <button type="submit" class="btn btn-sm btn-outline-primary px-3">Filter</button>
+                <a href="{{ url_for('inventory') }}" class="btn btn-sm btn-outline-secondary">Reset</a>
+            </div>
+            
+            <input type="hidden" name="status" value="{{ current_status }}">
+        </form>
+
+        <!-- Quick Status Filter Pills -->
+        <div class="d-flex flex-wrap gap-2 pt-3 border-top mt-3">
+            <a href="{{ url_for('inventory', status='all', search=search, category=current_category) }}" 
+               class="badge text-decoration-none {% if current_status == 'all' %}bg-primary text-white{% else %}bg-light text-dark border{% endif %} px-3 py-2">
+                All Items
+            </a>
+            <a href="{{ url_for('inventory', status='low_stock', search=search, category=current_category) }}" 
+               class="badge text-decoration-none {% if current_status == 'low_stock' %}bg-warning text-dark{% else %}bg-light text-dark border{% endif %} px-3 py-2">
+                <i class="bi bi-exclamation-triangle-fill text-warning me-1"></i> Low Stock / Reorder
+            </a>
+            <a href="{{ url_for('inventory', status='expiring_soon', search=search, category=current_category) }}" 
+               class="badge text-decoration-none {% if current_status == 'expiring_soon' %}bg-warning-subtle text-dark border border-warning{% else %}bg-light text-dark border{% endif %} px-3 py-2">
+                <i class="bi bi-clock-fill text-warning me-1"></i> Expiring Soon (&le; 90d)
+            </a>
+            <a href="{{ url_for('inventory', status='expired', search=search, category=current_category) }}" 
+               class="badge text-decoration-none {% if current_status == 'expired' %}bg-danger text-white{% else %}bg-light text-dark border{% endif %} px-3 py-2">
+                <i class="bi bi-x-circle-fill text-danger me-1"></i> Expired Batches
+            </a>
+            <a href="{{ url_for('inventory', status='overstocked', search=search, category=current_category) }}" 
+               class="badge text-decoration-none {% if current_status == 'overstocked' %}bg-info text-dark{% else %}bg-light text-dark border{% endif %} px-3 py-2">
+                Overstocked
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Main Inventory Table -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Medicine & Therapeutic Details</th>
+                        <th>Category</th>
+                        <th>Current Usable Stock</th>
+                        <th>Min / Max Targets</th>
+                        <th>Stock Health</th>
+                        <th>FEFO Next Expiry</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for med in medicines %}
+                    <tr>
+                        <!-- Medicine details -->
+                        <td>
+                            <div>
+                                <a href="{{ url_for('medicine_detail', id=med.id) }}" class="fw-bold text-dark text-decoration-none">
+                                    {{ med.brand_name }}
+                                </a>
+                                <span class="badge bg-light text-secondary border ms-1">{{ med.dosage_form }}</span>
+                            </div>
+                            <div class="small text-muted">
+                                <em>{{ med.generic_name }}</em> &bull; {{ med.strength }}
+                            </div>
+                        </td>
+
+                        <!-- Category -->
+                        <td>
+                            <span class="badge bg-light text-dark border">{{ med.category.name }}</span>
+                        </td>
+
+                        <!-- Usable Stock -->
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fs-5 fw-bold {% if med.stock_status in ('LOW_STOCK', 'CRITICAL_LOW', 'OUT_OF_STOCK') %}text-danger{% else %}text-slate-800{% endif %}">
+                                    {{ med.total_stock }}
+                                </span>
+                                <span class="text-muted small">{{ med.unit }}</span>
+                            </div>
+                            {% if med.total_stock_all_batches > med.total_stock %}
+                                <div class="small text-danger">
+                                    <i class="bi bi-exclamation-circle"></i> {{ med.total_stock_all_batches - med.total_stock }} expired quarantined
+                                </div>
+                            {% endif %}
+                        </td>
+
+                        <!-- Min / Max Targets -->
+                        <td>
+                            <div class="small">
+                                <div><strong>Min (ROP):</strong> {{ med.min_stock }} {{ med.unit }}</div>
+                                <div><strong>Max:</strong> {{ med.max_stock }} {{ med.unit }}</div>
+                                <div class="text-muted" style="font-size: 0.75rem;">(ADC: {{ med.avg_daily_consumption }}/day &bull; LT: {{ med.lead_time_days }}d)</div>
+                            </div>
+                        </td>
+
+                        <!-- Stock Health Status -->
+                        <td>
+                            {% if med.stock_status == 'OUT_OF_STOCK' %}
+                                <span class="badge bg-danger">OUT OF STOCK</span>
+                            {% elif med.stock_status == 'CRITICAL_LOW' %}
+                                <span class="badge bg-danger-subtle text-danger border border-danger">CRITICAL LOW</span>
+                            {% elif med.stock_status == 'LOW_STOCK' %}
+                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning">REORDER POINT</span>
+                            {% elif med.stock_status == 'OVERSTOCKED' %}
+                                <span class="badge bg-info-subtle text-info-emphasis border border-info">OVERSTOCKED</span>
+                            {% else %}
+                                <span class="badge bg-success-subtle text-success border border-success">NORMAL</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- FEFO Next Expiry -->
+                        <td>
+                            {% set next_batch = med.earliest_expiring_batch %}
+                            {% if next_batch %}
+                                <div class="small">
+                                    <span class="fw-semibold">{{ next_batch.batch_number }}</span>
+                                    <div class="d-flex align-items-center gap-1">
+                                        {% if next_batch.expiry_status == 'EXPIRED' %}
+                                            <span class="badge badge-expired small">Expired ({{ abs(next_batch.days_until_expiry) }}d ago)</span>
+                                        {% elif next_batch.expiry_status == 'CRITICAL' %}
+                                            <span class="badge badge-critical small">{{ next_batch.days_until_expiry }} days left</span>
+                                        {% elif next_batch.expiry_status == 'WARNING' %}
+                                            <span class="badge badge-warning-custom small">{{ next_batch.days_until_expiry }} days left</span>
+                                        {% else %}
+                                            <span class="badge badge-good small">{{ next_batch.expiry_date.strftime('%b %Y') }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% else %}
+                                <span class="text-muted small">No active batches</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Actions -->
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('medicine_detail', id=med.id) }}" class="btn btn-outline-secondary" title="View details">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{{ url_for('dispense', medicine_id=med.id) }}" class="btn btn-outline-primary" title="Dispense under FEFO">
+                                    <i class="bi bi-box-arrow-up-right"></i>
+                                </a>
+                                <a href="{{ url_for('add_batch', medicine_id=med.id) }}" class="btn btn-outline-success" title="Add Batch">
+                                    <i class="bi bi-plus-lg"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5 text-muted">
+                            <i class="bi bi-inbox fs-2 d-block mb-2 text-secondary"></i>
+                            No medicines found matching the selected criteria.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if medicine %}Edit {{ medicine.brand_name }}{% else %}Add New Medicine{% endif %}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-9">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                <div>
+                    <h5 class="fw-bold mb-0 text-slate-800">
+                        <i class="bi bi-capsule me-2 text-teal" style="color: #0d9488;"></i>
+                        {% if medicine %}Edit Medicine Profile: {{ medicine.brand_name }}{% else %}Register New Medicine{% endif %}
+                    </h5>
+                    <span class="text-muted small">Enter clinical and inventory control parameters</span>
+                </div>
+                <a href="{{ url_for('inventory') }}" class="btn btn-sm btn-outline-secondary">Cancel</a>
+            </div>
+
+            <div class="card-body p-4">
+                <form method="POST">
+                    <!-- Section 1: Clinical & Product Information -->
+                    <h6 class="fw-bold text-uppercase text-muted small mb-3 tracking-wider border-bottom pb-2">
+                        1. Product & Therapeutic Information
+                    </h6>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Brand / Trade Name <span class="text-danger">*</span></label>
+                            <input type="text" name="brand_name" class="form-control" placeholder="e.g. Panadol Extra, Amoxil" value="{{ medicine.brand_name if medicine else '' }}" required>
+                            <div class="form-text">Commercial name on the box.</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Generic Name (INN) <span class="text-danger">*</span></label>
+                            <input type="text" name="generic_name" class="form-control" placeholder="e.g. Paracetamol + Caffeine, Amoxicillin" value="{{ medicine.generic_name if medicine else '' }}" required>
+                            <div class="form-text">Active pharmaceutical ingredient (API).</div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Therapeutic Category <span class="text-danger">*</span></label>
+                            <select name="category_id" class="form-select" required>
+                                <option value="">-- Select Category --</option>
+                                {% for cat in categories %}
+                                    <option value="{{ cat.id }}" {% if medicine and medicine.category_id == cat.id %}selected{% endif %}>
+                                        {{ cat.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Dosage Form <span class="text-danger">*</span></label>
+                            <select name="dosage_form" class="form-select" required>
+                                {% set forms = ['Tablet', 'Capsule', 'Syrup', 'Suspension', 'Injection', 'Ointment / Cream', 'Inhaler', 'Eye/Ear Drops', 'Suppository'] %}
+                                {% for f in forms %}
+                                    <option value="{{ f }}" {% if medicine and medicine.dosage_form == f %}selected{% endif %}>{{ f }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-2">
+                            <label class="form-label fw-semibold">Strength <span class="text-danger">*</span></label>
+                            <input type="text" name="strength" class="form-control" placeholder="e.g. 500mg, 10mg/5ml" value="{{ medicine.strength if medicine else '' }}" required>
+                        </div>
+
+                        <div class="col-md-2">
+                            <label class="form-label fw-semibold">Dispensing Unit <span class="text-danger">*</span></label>
+                            <select name="unit" class="form-select" required>
+                                {% set units = ['Tablets', 'Capsules', 'Bottles', 'Ampoules', 'Vials', 'Strips', 'Boxes', 'Tubes'] %}
+                                {% for u in units %}
+                                    <option value="{{ u }}" {% if medicine and medicine.unit == u %}selected{% endif %}>{{ u }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Section 2: Pharmacy Inventory Formulas & Planning -->
+                    <h6 class="fw-bold text-uppercase text-muted small mb-3 tracking-wider border-bottom pb-2">
+                        2. Pharmacy Inventory Control Parameters
+                    </h6>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Average Daily Consumption (ADC)</label>
+                            <input type="number" step="0.1" min="0.1" name="avg_daily_consumption" class="form-control" value="{{ medicine.avg_daily_consumption if medicine else '10.0' }}" required>
+                            <div class="form-text">Estimated daily dispense rate in units.</div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Supplier Lead Time (Days)</label>
+                            <input type="number" min="1" max="180" name="lead_time_days" class="form-control" value="{{ medicine.lead_time_days if medicine else '7' }}" required>
+                            <div class="form-text">Days from placing PO to stock arrival.</div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Safety Stock Buffer (Days)</label>
+                            <input type="number" min="1" max="90" name="safety_stock_days" class="form-control" value="{{ medicine.safety_stock_days if medicine else '5' }}" required>
+                            <div class="form-text">Extra safety buffer to prevent stockouts.</div>
+                        </div>
+                    </div>
+
+                    {% if not medicine %}
+                    <!-- Section 3: Initial Stock Batch (Optional when creating new medicine) -->
+                    <h6 class="fw-bold text-uppercase text-muted small mb-3 tracking-wider border-bottom pb-2">
+                        3. Initial Batch Receipt <span class="text-muted fw-normal text-none">(Optional)</span>
+                    </h6>
+
+                    <div class="row g-3 mb-4 bg-light p-3 rounded border">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Initial Batch Number</label>
+                            <input type="text" name="batch_number" class="form-control form-control-sm" placeholder="e.g. BN2024-001">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Received Quantity</label>
+                            <input type="number" min="1" name="initial_quantity" class="form-control form-control-sm" placeholder="e.g. 100">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Expiration Date</label>
+                            <input type="date" name="expiry_date" class="form-control form-control-sm">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Purchase Cost ($ / unit)</label>
+                            <input type="number" step="0.01" min="0" name="purchase_price" class="form-control form-control-sm" placeholder="0.25">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Selling Price ($ / unit)</label>
+                            <input type="number" step="0.01" min="0" name="selling_price" class="form-control form-control-sm" placeholder="0.60">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Pharmaceutical Supplier</label>
+                            <input type="text" name="supplier" class="form-control form-control-sm" placeholder="e.g. Pfizer, Sandoz">
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{{ url_for('inventory') }}" class="btn btn-outline-secondary px-4">Cancel</a>
+                        <button type="submit" class="btn btn-primary px-4 fw-semibold">
+                            <i class="bi bi-check2-circle me-1"></i> Save Medicine
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
